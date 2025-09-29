@@ -1,4 +1,4 @@
-import { Alchemy, Network } from 'alchemy-sdk';
+import { Alchemy, Network, Utils } from 'alchemy-sdk';
 import { useEffect, useState } from 'react';
 
 import './App.css';
@@ -107,7 +107,7 @@ function TransactionView() {
   }, [txHash, bnParam]);
 
   return (
-    <div className="App">
+    <div>
       <h2>Transaction</h2>
       {error ? (
         <p style={{ color: 'red' }}>{error}</p>
@@ -137,6 +137,147 @@ function TransactionView() {
   );
 }
 
+function Header() {
+  const base = `${window.location.origin}${window.location.pathname}`;
+  return (
+    <header style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '12px 16px', borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, background: '#fff', zIndex: 1
+    }}>
+      <div style={{ fontWeight: 600 }}>
+        <a href={base} style={{ color: '#0b5ed7', textDecoration: 'none' }}>Block Explorer</a>
+      </div>
+      <nav>
+        <a href={`${base}?page=user`} style={{ color: '#0b5ed7', textDecoration: 'underline' }}>User</a>
+      </nav>
+    </header>
+  );
+}
+
+function UserPage() {
+  const [account, setAccount] = useState(null);
+  const [accLoading, setAccLoading] = useState(false);
+  const [accError, setAccError] = useState(null);
+  const [accBalance, setAccBalance] = useState(null);
+
+  const [addrInput, setAddrInput] = useState('');
+  const [addrLoading, setAddrLoading] = useState(false);
+  const [addrError, setAddrError] = useState(null);
+  const [addrBalance, setAddrBalance] = useState(null);
+
+  async function connectMetaMask() {
+    try {
+      if (!window.ethereum) {
+        setAccError('MetaMask not found in the browser');
+        return;
+      }
+      setAccError(null);
+      setAccLoading(true);
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const first = accounts && accounts[0];
+      setAccount(first || null);
+    } catch (e) {
+      setAccError(e?.message || 'Failed to connect to MetaMask');
+    } finally {
+      setAccLoading(false);
+    }
+  }
+
+  // Fetch ETH balance using the currently selected chain in MetaMask when available.
+  // Falls back to Alchemy (mainnet config) if MetaMask is not present.
+  async function getEthBalance(address) {
+    if (window.ethereum) {
+      const hexWei = await window.ethereum.request({
+        method: 'eth_getBalance',
+        params: [address, 'latest'],
+      });
+      // hexWei like '0x1234...'
+      const hasBigInt = (typeof window !== 'undefined') && (typeof window.BigInt === 'function');
+      const wei = hasBigInt ? window.BigInt(hexWei) : parseInt(hexWei, 16);
+      return Utils.formatEther(wei);
+    }
+    const wei = await alchemy.core.getBalance(address, 'latest');
+    return Utils.formatEther(wei);
+  }
+
+  useEffect(() => {
+    async function loadBalance() {
+      if (!account) { setAccBalance(null); return; }
+      try {
+        setAccError(null);
+        setAccLoading(true);
+        const eth = await getEthBalance(account);
+        setAccBalance(eth);
+      } catch (e) {
+        setAccError(e?.message || 'Failed to fetch balance');
+      } finally {
+        setAccLoading(false);
+      }
+    }
+    loadBalance();
+  }, [account]);
+
+  async function fetchAddrBalance() {
+    const addr = addrInput.trim();
+    if (!addr) { setAddrError('Enter an address'); setAddrBalance(null); return; }
+    try {
+      setAddrError(null);
+      setAddrLoading(true);
+      const eth = await getEthBalance(addr);
+      setAddrBalance(eth);
+    } catch (e) {
+      setAddrError(e?.message || 'Не удалось получить баланс по адресу');
+      setAddrBalance(null);
+    } finally {
+      setAddrLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: '16px' }}>
+      <h2>User</h2>
+      <section style={{ marginBottom: 24 }}>
+        <h3>Connected account balance (MetaMask)</h3>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button type="button" onClick={connectMetaMask} disabled={accLoading}>
+            {accLoading ? 'Connecting…' : (account ? 'Reconnect' : 'Connect MetaMask')}
+          </button>
+          {account && <span style={{ fontFamily: 'monospace' }}>{account}</span>}
+        </div>
+        {accError && <p style={{ color: 'red' }}>{accError}</p>}
+        <div style={{ marginTop: 8 }}>
+          {account ? (
+            accLoading ? 'Loading balance…' : (
+              accBalance != null ? <strong>{accBalance} ETH</strong> : 'No data')
+          ) : 'Account is not connected'}
+        </div>
+      </section>
+
+      <section>
+        <h3>Get balance by address</h3>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="0x... address"
+            value={addrInput}
+            onChange={(e) => setAddrInput(e.target.value)}
+            style={{ minWidth: 280 }}
+          />
+          <button type="button" onClick={fetchAddrBalance} disabled={addrLoading}>
+            {addrLoading ? 'Request…' : 'Get balance'}
+          </button>
+        </div>
+        {addrError && <p style={{ color: 'red' }}>{addrError}</p>}
+        {addrBalance != null && (
+          <div style={{ marginTop: 8 }}>
+            Balance: <strong>{addrBalance} ETH</strong>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function App() {
   const [blockNumber, setBlockNumber] = useState();
 
@@ -146,7 +287,6 @@ function App() {
     }
     getBlockNumber();
   }, []);
-
 
   // more block info (lazy-loaded on click)
   const [blockInfo, setBlockInfo] = useState();
@@ -179,90 +319,99 @@ function App() {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
-  // If opened as a dedicated transaction page via query param, render it
+  // Determine current page from URL
   const urlParams = new URLSearchParams(window.location.search);
   const txParam = urlParams.get('tx');
-  if (txParam) {
-    return <TransactionView />;
-  }
+  const pageParam = urlParams.get('page');
 
-  return <div className="App">
-      <p>Block Number: <br/> <span>{blockNumber}</span></p>
-      <hr></hr>
-      <h3>
-        <button
-          type="button"
-          onClick={toggleBlockInfo}
-          disabled={infoLoading}
-          aria-busy={infoLoading}
-          style={{ background: 'none', border: 'none', padding: 0, color: '#0b5ed7', textDecoration: 'underline', cursor: infoLoading ? 'not-allowed' : 'pointer' }}
-        >
-          {`Block Info${infoLoading ? ' (loading...)' : ''}`}
-        </button>
-      </h3>
-      {isBlockOpen && (
-        infoError ? (
-          <p style={{ color: 'red' }}>{infoError}</p>
-        ) : infoLoading ? (
-          <p>Loading...</p>
-        ) : blockInfo ? (
-          <ul>
-              {Object.entries(blockInfo)
+  return (
+    <div className="App">
+      <Header />
+      {txParam ? (
+        <TransactionView />
+      ) : pageParam === 'user' ? (
+        <UserPage />
+      ) : (
+        <div style={{ padding: '16px' }}>
+          <p>Block Number: <br/> <span>{blockNumber}</span></p>
+          <hr />
+          <h3>
+            <button
+              type="button"
+              onClick={toggleBlockInfo}
+              disabled={infoLoading}
+              aria-busy={infoLoading}
+              style={{ background: 'none', border: 'none', padding: 0, color: '#0b5ed7', textDecoration: 'underline', cursor: infoLoading ? 'not-allowed' : 'pointer' }}
+            >
+              {`Block Info${infoLoading ? ' (loading...)' : ''}`}
+            </button>
+          </h3>
+          {isBlockOpen && (
+            infoError ? (
+              <p style={{ color: 'red' }}>{infoError}</p>
+            ) : infoLoading ? (
+              <p>Loading...</p>
+            ) : blockInfo ? (
+              <ul>
+                {Object.entries(blockInfo)
                   .sort(([a], [b]) => (a === 'transactions') - (b === 'transactions'))
                   .map(([key, value]) => (
-                  key === 'transactions' && Array.isArray(value) ? (
+                    key === 'transactions' && Array.isArray(value) ? (
                       <li key={key}>
-                          <strong>{key}:</strong>
-                          <ul>
-                              {value.map((tx, idx) => {
-                                  const hash = typeof tx === 'string' ? tx : tx?.hash;
-                                  const label = hash || (typeof tx === 'object' ? JSON.stringify(tx) : String(tx));
-                                  const href = `?tx=${encodeURIComponent(hash || '')}${blockNumber != null ? `&bn=${encodeURIComponent(blockNumber)}` : ''}`;
-                                  return (
-                                      <li key={idx}>
-                                          {hash ? (
-                                              <a
-                                                  href={href}
-                                                  onClick={(e) => {
-                                                    e.preventDefault();
-                                                    openTxInNewTab(tx);
-                                                  }}
-                                                  style={{ color: '#0b5ed7', textDecoration: 'underline', cursor: 'pointer' }}
-                                              >
-                                                  {label}
-                                              </a>
-                                          ) : (
-                                              label
-                                          )}
-                                      </li>
-                                  );
-                              })}
-                          </ul>
+                        <strong>{key}:</strong>
+                        <ul>
+                          {value.map((tx, idx) => {
+                            const hash = typeof tx === 'string' ? tx : tx?.hash;
+                            const label = hash || (typeof tx === 'object' ? JSON.stringify(tx) : String(tx));
+                            const href = `?tx=${encodeURIComponent(hash || '')}${blockNumber != null ? `&bn=${encodeURIComponent(blockNumber)}` : ''}`;
+                            return (
+                              <li key={idx}>
+                                {hash ? (
+                                  <a
+                                    href={href}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      openTxInNewTab(tx);
+                                    }}
+                                    style={{ color: '#0b5ed7', textDecoration: 'underline', cursor: 'pointer' }}
+                                  >
+                                    {label}
+                                  </a>
+                                ) : (
+                                  label
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </li>
-                  ) : (
+                    ) : (
                       <li key={key}>
-                          <strong>{key}:</strong>{" "}
-                          {key === 'timestamp' ? (
-                            (() => {
-                              const isNum = typeof value === 'number' && Number.isFinite(value);
-                              const d = isNum ? new Date(value * 1000) : new Date(value);
-                              const isValid = !isNaN(d.getTime());
-                              const full = isValid ? d.toISOString() : String(value);
-                              const shown = isValid ? d.toLocaleString() + ' (' + d.toISOString() + ')' : String(value);
-                              return <EllipsisCopy text={shown} title={full} />;
-                            })()
-                          ) : (
-                            typeof value === 'object' ? JSON.stringify(value) : value.toString()
-                          )}
+                        <strong>{key}:</strong>{' '}
+                        {key === 'timestamp' ? (
+                          (() => {
+                            const isNum = typeof value === 'number' && Number.isFinite(value);
+                            const d = isNum ? new Date(value * 1000) : new Date(value);
+                            const isValid = !isNaN(d.getTime());
+                            const full = isValid ? d.toISOString() : String(value);
+                            const shown = isValid ? d.toLocaleString() + ' (' + d.toISOString() + ')' : String(value);
+                            return <EllipsisCopy text={shown} title={full} />;
+                          })()
+                        ) : (
+                          typeof value === 'object' ? JSON.stringify(value) : value.toString()
+                        )}
                       </li>
-                  )
-              ))}
-          </ul>
-        ) : (
-          <p>No data</p>
-        )
+                    )
+                  ))}
+              </ul>
+            ) : (
+              <p>No data</p>
+            )
+          )}
+        </div>
       )}
-  </div>;
+    </div>
+  );
 }
 
 export default App;
