@@ -19,6 +19,124 @@ const settings = {
 //   https://docs.alchemy.com/reference/alchemy-sdk-api-surface-overview#api-surface
 const alchemy = new Alchemy(settings);
 
+// A small helper that visually truncates long text with ellipsis
+// but copies the full value to clipboard on Cmd/Ctrl+C.
+function EllipsisCopy({ text, title }) {
+  const full = String(text ?? '');
+  function handleCopy(e) {
+    try {
+      if (e?.clipboardData) {
+        e.clipboardData.setData('text/plain', full);
+        e.preventDefault();
+      }
+    } catch (_) {
+      // noop: fallback to default copy
+    }
+  }
+  return (
+    <span
+      title={title || full}
+      onCopy={handleCopy}
+      style={{
+        display: 'inline-block',
+        maxWidth: '100%',
+        verticalAlign: 'bottom',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {full}
+    </span>
+  );
+}
+
+function TransactionView() {
+  const params = new URLSearchParams(window.location.search);
+  const txHash = params.get('tx');
+  const bnParam = params.get('bn');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [tx, setTx] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+        let block = null;
+        let found = null;
+        if (bnParam != null) {
+          const num = Number(bnParam);
+          const key = Number.isNaN(num) ? bnParam : num;
+          block = await alchemy.core.getBlockWithTransactions(key);
+          found = block?.transactions?.find((t) => (t && typeof t === 'object' ? t.hash : t) === txHash);
+        }
+        // If not found in the provided block (or no bn), fall back to fetching the tx directly
+        if (!found && txHash) {
+          const t = await alchemy.core.getTransaction(txHash);
+          if (t && t.blockHash) {
+            // If we already fetched a block and it's a different one, refetch by the actual tx blockHash
+            if (!block || (block && block.hash !== t.blockHash)) {
+              block = await alchemy.core.getBlockWithTransactions(t.blockHash);
+            }
+            found = block?.transactions?.find((x) => (x && typeof x === 'object' ? x.hash : x) === txHash) || t;
+          } else {
+            // Pending or unknown block — at least show whatever we have
+            found = t;
+          }
+        }
+        if (!found) {
+          setError('Transaction not found');
+          setTx(null);
+          return;
+        }
+        setTx(found);
+      } catch (e) {
+        setError(e?.message || 'Failed to load transaction');
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (txHash) {
+      load();
+    } else {
+      setError('No tx hash provided');
+      setLoading(false);
+    }
+  }, [txHash, bnParam]);
+
+  return (
+    <div className="App">
+      <h2>Transaction</h2>
+      {error ? (
+        <p style={{ color: 'red' }}>{error}</p>
+      ) : loading ? (
+        <p>Loading...</p>
+      ) : tx ? (
+        <div style={{ textAlign: 'left' }}>
+          <ul>
+            {Object.entries(tx)
+              .filter(([, value]) => typeof value !== 'function')
+              .map(([key, value]) => (
+              <li key={key}>
+                <strong>{key}:</strong>{' '}
+                {((key === 'input' || key === 'data') && typeof value === 'string') ? (
+                  <EllipsisCopy text={value} title={value} />
+                ) : (
+                  typeof value === 'object' ? JSON.stringify(value) : String(value)
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p>No data</p>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [blockNumber, setBlockNumber] = useState();
 
@@ -28,6 +146,7 @@ function App() {
     }
     getBlockNumber();
   }, []);
+
 
   // more block info (lazy-loaded on click)
   const [blockInfo, setBlockInfo] = useState();
@@ -50,6 +169,21 @@ function App() {
         setInfoLoading(false);
       }
     }
+  }
+
+  function openTxInNewTab(tx) {
+    const hash = typeof tx === 'string' ? tx : tx?.hash;
+    if (!hash) return;
+    const base = `${window.location.origin}${window.location.pathname}`;
+    const url = `${base}?tx=${encodeURIComponent(hash)}${blockNumber != null ? `&bn=${encodeURIComponent(blockNumber)}` : ''}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  // If opened as a dedicated transaction page via query param, render it
+  const urlParams = new URLSearchParams(window.location.search);
+  const txParam = urlParams.get('tx');
+  if (txParam) {
+    return <TransactionView />;
   }
 
   return <div className="App">
@@ -80,19 +214,46 @@ function App() {
                       <li key={key}>
                           <strong>{key}:</strong>
                           <ul>
-                              {value.map((tx, idx) => (
-                                  <li key={idx}>
-                                      {typeof tx === 'string' ? tx : JSON.stringify(tx)}
-                                  </li>
-                              ))}
+                              {value.map((tx, idx) => {
+                                  const hash = typeof tx === 'string' ? tx : tx?.hash;
+                                  const label = hash || (typeof tx === 'object' ? JSON.stringify(tx) : String(tx));
+                                  const href = `?tx=${encodeURIComponent(hash || '')}${blockNumber != null ? `&bn=${encodeURIComponent(blockNumber)}` : ''}`;
+                                  return (
+                                      <li key={idx}>
+                                          {hash ? (
+                                              <a
+                                                  href={href}
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    openTxInNewTab(tx);
+                                                  }}
+                                                  style={{ color: '#0b5ed7', textDecoration: 'underline', cursor: 'pointer' }}
+                                              >
+                                                  {label}
+                                              </a>
+                                          ) : (
+                                              label
+                                          )}
+                                      </li>
+                                  );
+                              })}
                           </ul>
                       </li>
                   ) : (
                       <li key={key}>
                           <strong>{key}:</strong>{" "}
-                          {typeof value === "object"
-                              ? JSON.stringify(value)
-                              : value.toString()}
+                          {key === 'timestamp' ? (
+                            (() => {
+                              const isNum = typeof value === 'number' && Number.isFinite(value);
+                              const d = isNum ? new Date(value * 1000) : new Date(value);
+                              const isValid = !isNaN(d.getTime());
+                              const full = isValid ? d.toISOString() : String(value);
+                              const shown = isValid ? d.toLocaleString() + ' (' + d.toISOString() + ')' : String(value);
+                              return <EllipsisCopy text={shown} title={full} />;
+                            })()
+                          ) : (
+                            typeof value === 'object' ? JSON.stringify(value) : value.toString()
+                          )}
                       </li>
                   )
               ))}
