@@ -29,34 +29,77 @@ function App() {
     getBlockNumber();
   }, []);
 
-  // more block info
+  // more block info (lazy-loaded on click)
   const [blockInfo, setBlockInfo] = useState();
-  useEffect(() => {
-    if (blockNumber == null) return;
-    async function fetchBlockByNumber() {
-      const info = await alchemy.core.getBlock(blockNumber);
-      setBlockInfo(info);
+  const [isBlockOpen, setIsBlockOpen] = useState(false);
+  const [infoLoading, setInfoLoading] = useState(false);
+  const [infoError, setInfoError] = useState(null);
+
+  async function toggleBlockInfo() {
+    const nextOpen = !isBlockOpen;
+    setIsBlockOpen(nextOpen);
+    if (nextOpen && !blockInfo && blockNumber != null) {
+      setInfoLoading(true);
+      setInfoError(null);
+      try {
+        const info = await alchemy.core.getBlock(blockNumber);
+        setBlockInfo(info);
+      } catch (e) {
+        setInfoError(e?.message || 'Failed to load block info');
+      } finally {
+        setInfoLoading(false);
+      }
     }
-    fetchBlockByNumber();
-  }, [blockNumber]);
+  }
 
   return <div className="App">
       <p>Block Number: <br/> <span>{blockNumber}</span></p>
       <hr></hr>
-      <h3>Block Info</h3>
-      {blockInfo ? (
+      <h3>
+        <button
+          type="button"
+          onClick={toggleBlockInfo}
+          disabled={infoLoading}
+          aria-busy={infoLoading}
+          style={{ background: 'none', border: 'none', padding: 0, color: '#0b5ed7', textDecoration: 'underline', cursor: infoLoading ? 'not-allowed' : 'pointer' }}
+        >
+          {`Block Info${infoLoading ? ' (loading...)' : ''}`}
+        </button>
+      </h3>
+      {isBlockOpen && (
+        infoError ? (
+          <p style={{ color: 'red' }}>{infoError}</p>
+        ) : infoLoading ? (
+          <p>Loading...</p>
+        ) : blockInfo ? (
           <ul>
-              {Object.entries(blockInfo).map(([key, value]) => (
-                  <li key={key}>
-                      <strong>{key}:</strong>{" "}
-                      {typeof value === "object"
-                          ? JSON.stringify(value)
-                          : value.toString()}
-                  </li>
+              {Object.entries(blockInfo)
+                  .sort(([a], [b]) => (a === 'transactions') - (b === 'transactions'))
+                  .map(([key, value]) => (
+                  key === 'transactions' && Array.isArray(value) ? (
+                      <li key={key}>
+                          <strong>{key}:</strong>
+                          <ul>
+                              {value.map((tx, idx) => (
+                                  <li key={idx}>
+                                      {typeof tx === 'string' ? tx : JSON.stringify(tx)}
+                                  </li>
+                              ))}
+                          </ul>
+                      </li>
+                  ) : (
+                      <li key={key}>
+                          <strong>{key}:</strong>{" "}
+                          {typeof value === "object"
+                              ? JSON.stringify(value)
+                              : value.toString()}
+                      </li>
+                  )
               ))}
           </ul>
-      ) : (
-          <p>Loading...</p>
+        ) : (
+          <p>No data</p>
+        )
       )}
   </div>;
 }
