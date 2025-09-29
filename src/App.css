@@ -1,38 +1,150 @@
+:root {
+  --bg: #f8f9fa;
+  --card-bg: #ffffff;
+  --text: #212529;
+  --muted: #6c757d;
+  --border: #e5e7eb;
+  --link: #0d6efd;
+  --link-hover: #0b5ed7;
+  --danger: #dc3545;
+  --success: #198754;
+  --warning: #ffc107;
+  --radius: 8px;
+  --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  --font: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol",sans-serif;
+}
+
+/* Base */
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Layout */
 .App {
-  text-align: center;
+  text-align: left;
+}
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 16px;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* Header */
+header {
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+header a {
+  color: var(--link);
+}
+header a:hover {
+  color: var(--link-hover);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Typography */
+h1, h2, h3, h4, h5 {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+p {
+  margin: 0 0 10px;
+  color: var(--text);
+}
+small, .muted {
+  color: var(--muted);
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+/* Lists (unstyled, compact like Etherscan) */
+ul, ol {
+  list-style: none;
+  margin: 0 0 12px 0;
+  padding-left: 0;
+}
+li {
+  margin: 6px 0;
 }
 
-.App-link {
-  color: #61dafb;
+/* Card-like blocks */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+.hr, hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Links */
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+/* Controls */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+}
+button {
+  background: var(--link);
+  color: #fff;
+  border: 1px solid var(--link);
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+button.linklike {
+  background: transparent;
+  color: var(--link);
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+}
+input[type="text"], input[type="search"], textarea, select {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  outline: none;
+}
+input[type="text"]:focus, input[type="search"]:focus, textarea:focus, select:focus {
+  border-color: var(--link);
+  box-shadow: 0 0 0 3px rgba(13,110,253,0.1);
+}
+
+/* Utility */
+.mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+.nowrap { white-space: nowrap; }
+.ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Content specific tweaks */
+.App .content { padding: 16px; }
+.App .section { margin-bottom: 24px; }
+
+/* Remove pre horizontal overflow if any */
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }

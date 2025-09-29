@@ -141,15 +141,16 @@ function Header() {
   const base = `${window.location.origin}${window.location.pathname}`;
   return (
     <header style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '12px 16px', borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, background: '#fff', zIndex: 1
+      borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, background: '#fff', zIndex: 1
     }}>
-      <div style={{ fontWeight: 600 }}>
-        <a href={base} style={{ color: '#0b5ed7', textDecoration: 'none' }}>Block Explorer</a>
+      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+        <div style={{ fontWeight: 600 }}>
+          <a href={base} style={{ color: '#0b5ed7', textDecoration: 'none' }}>Block Explorer</a>
+        </div>
+        <nav>
+          <a href={`${base}?page=user`} style={{ color: '#0b5ed7', textDecoration: 'underline' }}>User</a>
+        </nav>
       </div>
-      <nav>
-        <a href={`${base}?page=user`} style={{ color: '#0b5ed7', textDecoration: 'underline' }}>User</a>
-      </nav>
     </header>
   );
 }
@@ -234,7 +235,7 @@ function UserPage() {
   }
 
   return (
-    <div style={{ padding: '16px' }}>
+    <div>
       <h2>User</h2>
       <section style={{ marginBottom: 24 }}>
         <h3>Connected account balance (MetaMask)</h3>
@@ -327,89 +328,91 @@ function App() {
   return (
     <div className="App">
       <Header />
-      {txParam ? (
-        <TransactionView />
-      ) : pageParam === 'user' ? (
-        <UserPage />
-      ) : (
-        <div style={{ padding: '16px' }}>
-          <p>Block Number: <br/> <span>{blockNumber}</span></p>
-          <hr />
-          <h3>
-            <button
-              type="button"
-              onClick={toggleBlockInfo}
-              disabled={infoLoading}
-              aria-busy={infoLoading}
-              style={{ background: 'none', border: 'none', padding: 0, color: '#0b5ed7', textDecoration: 'underline', cursor: infoLoading ? 'not-allowed' : 'pointer' }}
-            >
-              {`Block Info${infoLoading ? ' (loading...)' : ''}`}
-            </button>
-          </h3>
-          {isBlockOpen && (
-            infoError ? (
-              <p style={{ color: 'red' }}>{infoError}</p>
-            ) : infoLoading ? (
-              <p>Loading...</p>
-            ) : blockInfo ? (
-              <ul>
-                {Object.entries(blockInfo)
-                  .sort(([a], [b]) => (a === 'transactions') - (b === 'transactions'))
-                  .map(([key, value]) => (
-                    key === 'transactions' && Array.isArray(value) ? (
-                      <li key={key}>
-                        <strong>{key}:</strong>
-                        <ul>
-                          {value.map((tx, idx) => {
-                            const hash = typeof tx === 'string' ? tx : tx?.hash;
-                            const label = hash || (typeof tx === 'object' ? JSON.stringify(tx) : String(tx));
-                            const href = `?tx=${encodeURIComponent(hash || '')}${blockNumber != null ? `&bn=${encodeURIComponent(blockNumber)}` : ''}`;
-                            return (
-                              <li key={idx}>
-                                {hash ? (
-                                  <a
-                                    href={href}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      openTxInNewTab(tx);
-                                    }}
-                                    style={{ color: '#0b5ed7', textDecoration: 'underline', cursor: 'pointer' }}
-                                  >
-                                    {label}
-                                  </a>
-                                ) : (
-                                  label
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </li>
-                    ) : (
-                      <li key={key}>
-                        <strong>{key}:</strong>{' '}
-                        {key === 'timestamp' ? (
-                          (() => {
-                            const isNum = typeof value === 'number' && Number.isFinite(value);
-                            const d = isNum ? new Date(value * 1000) : new Date(value);
-                            const isValid = !isNaN(d.getTime());
-                            const full = isValid ? d.toISOString() : String(value);
-                            const shown = isValid ? d.toLocaleString() + ' (' + d.toISOString() + ')' : String(value);
-                            return <EllipsisCopy text={shown} title={full} />;
-                          })()
-                        ) : (
-                          typeof value === 'object' ? JSON.stringify(value) : value.toString()
-                        )}
-                      </li>
-                    )
-                  ))}
-              </ul>
-            ) : (
-              <p>No data</p>
-            )
-          )}
-        </div>
-      )}
+      <main className="container content">
+        {txParam ? (
+          <TransactionView />
+        ) : pageParam === 'user' ? (
+          <UserPage />
+        ) : (
+          <div>
+            <p>Block Number: <br/> <span>{blockNumber}</span></p>
+            <hr />
+            <h3>
+              <button
+                type="button"
+                onClick={toggleBlockInfo}
+                disabled={infoLoading}
+                aria-busy={infoLoading}
+                style={{ background: 'none', border: 'none', padding: 0, color: '#0b5ed7', textDecoration: 'underline', cursor: infoLoading ? 'not-allowed' : 'pointer' }}
+              >
+                {`Block Info${infoLoading ? ' (loading...)' : ''}`}
+              </button>
+            </h3>
+            {isBlockOpen && (
+              infoError ? (
+                <p style={{ color: 'red' }}>{infoError}</p>
+              ) : infoLoading ? (
+                <p>Loading...</p>
+              ) : blockInfo ? (
+                <ul>
+                  {Object.entries(blockInfo)
+                    .sort(([a], [b]) => (a === 'transactions') - (b === 'transactions'))
+                    .map(([key, value]) => (
+                      key === 'transactions' && Array.isArray(value) ? (
+                        <li key={key}>
+                          <strong>{key}:</strong>
+                          <ul>
+                            {value.map((tx, idx) => {
+                              const hash = typeof tx === 'string' ? tx : tx?.hash;
+                              const label = hash || (typeof tx === 'object' ? JSON.stringify(tx) : String(tx));
+                              const href = `?tx=${encodeURIComponent(hash || '')}${blockNumber != null ? `&bn=${encodeURIComponent(blockNumber)}` : ''}`;
+                              return (
+                                <li key={idx}>
+                                  {hash ? (
+                                    <a
+                                      href={href}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openTxInNewTab(tx);
+                                      }}
+                                      style={{ color: '#0b5ed7', textDecoration: 'underline', cursor: 'pointer' }}
+                                    >
+                                      {label}
+                                    </a>
+                                  ) : (
+                                    label
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </li>
+                      ) : (
+                        <li key={key}>
+                          <strong>{key}:</strong>{' '}
+                          {key === 'timestamp' ? (
+                            (() => {
+                              const isNum = typeof value === 'number' && Number.isFinite(value);
+                              const d = isNum ? new Date(value * 1000) : new Date(value);
+                              const isValid = !isNaN(d.getTime());
+                              const full = isValid ? d.toISOString() : String(value);
+                              const shown = isValid ? d.toLocaleString() + ' (' + d.toISOString() + ')' : String(value);
+                              return <EllipsisCopy text={shown} title={full} />;
+                            })()
+                          ) : (
+                            typeof value === 'object' ? JSON.stringify(value) : value.toString()
+                          )}
+                        </li>
+                      )
+                    ))}
+                </ul>
+              ) : (
+                <p>No data</p>
+              )
+            )}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
