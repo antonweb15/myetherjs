@@ -26,11 +26,39 @@ function App() {
     async function getBlockNumber() {
       setBlockNumber(await alchemy.core.getBlockNumber());
     }
-
     getBlockNumber();
-  });
+  }, []);
 
-  return <div className="App">Block Number: {blockNumber}</div>;
+  // more block info
+  const [blockInfo, setBlockInfo] = useState();
+  useEffect(() => {
+    if (blockNumber == null) return;
+    async function fetchBlockByNumber() {
+      const info = await alchemy.core.getBlock(blockNumber);
+      setBlockInfo(info);
+    }
+    fetchBlockByNumber();
+  }, [blockNumber]);
+
+  return <div className="App">
+      <p>Block Number: <br/> <span>{blockNumber}</span></p>
+      <hr></hr>
+      <h3>Block Info</h3>
+      {blockInfo ? (
+          <ul>
+              {Object.entries(blockInfo).map(([key, value]) => (
+                  <li key={key}>
+                      <strong>{key}:</strong>{" "}
+                      {typeof value === "object"
+                          ? JSON.stringify(value)
+                          : value.toString()}
+                  </li>
+              ))}
+          </ul>
+      ) : (
+          <p>Loading...</p>
+      )}
+  </div>;
 }
 
 export default App;
